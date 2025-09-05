@@ -43,49 +43,38 @@ class BerghainBouncer:
         remaining_capacity = 1000 - admitted_count
         if remaining_capacity <= 0:
             return 0.0
-            
-        correlations = attribute_stats.get("correlations", {})
-        frequencies = attribute_stats["relativeFrequencies"]
-        
-        total_value = 0.0
-        constraint_satisfaction = 0.0
-        
-        for constraint in constraints:
-            attr = constraint["attribute"]
-            min_count = constraint["minCount"]
-            current_count = current_counts.get(attr, 0)
-            remaining_needed = max(0, min_count - current_count)
-            
+
+        # If all constraints are already satisfied, admit everyone else to avoid
+        # unnecessary rejections and fill the club efficiently.
+        all_constraints_met = all(
+            current_counts.get(c["attribute"], 0) >= c["minCount"]
+            for c in constraints
+        )
+        if all_constraints_met:
+            return 1.0
+
+        remaining_needed_total = sum(
+            max(0, c["minCount"] - current_counts.get(c["attribute"], 0))
+            for c in constraints
+        )
+        slack = remaining_capacity - remaining_needed_total
+
+        has_constraint_attr = False
+        for c in constraints:
+            attr = c["attribute"]
+            min_count = c["minCount"]
+            current = current_counts.get(attr, 0)
             if person_attributes.get(attr, False):
-                constraint_satisfaction += 1
-                
-                if remaining_needed > 0:
-                    attr_frequency = frequencies[attr]
-                    expected_future_with_attr = remaining_capacity * attr_frequency
-                    
-                    urgency = remaining_needed / max(1, expected_future_with_attr)
-                    
-                    correlation_bonus = 0.0
-                    for other_attr, has_other in person_attributes.items():
-                        if has_other and other_attr != attr and other_attr in correlations.get(attr, {}):
-                            correlation_value = correlations[attr][other_attr]
-                            if correlation_value > 0:
-                                correlation_bonus += correlation_value * 0.1
-                    
-                    total_value += urgency * (1 + correlation_bonus)
-        
-        progress_ratio = admitted_count / 1000.0
-        if progress_ratio < 0.3:
-            threshold_modifier = 0.8
-        elif progress_ratio < 0.7:
-            threshold_modifier = 1.0
-        else:
-            threshold_modifier = 1.2
-            
-        if constraint_satisfaction > 0:
-            return min(1.0, (total_value / constraint_satisfaction) * threshold_modifier)
-        else:
-            return 0.1
+                has_constraint_attr = True
+                if current < min_count:
+                    return 1.0  # attribute still needed
+
+        # Person doesn't help meet unmet constraints.
+        if slack > 0:
+            # We have extra capacity; admit them even if they don't help directly.
+            return 1.0
+
+        return 0.0
     
     def run_scenario_with_existing_game(self, game_id: str, scenario: int) -> Dict:
         """Run a complete game using an existing game ID"""
