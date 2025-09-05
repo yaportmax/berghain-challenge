@@ -49,12 +49,16 @@ class BerghainBouncer:
         
         total_value = 0.0
         constraint_satisfaction = 0.0
+        all_constraints_met = True
         
         for constraint in constraints:
             attr = constraint["attribute"]
             min_count = constraint["minCount"]
             current_count = current_counts.get(attr, 0)
             remaining_needed = max(0, min_count - current_count)
+            
+            if remaining_needed > 0:
+                all_constraints_met = False
             
             if person_attributes.get(attr, False):
                 constraint_satisfaction += 1
@@ -63,7 +67,7 @@ class BerghainBouncer:
                     attr_frequency = frequencies[attr]
                     expected_future_with_attr = remaining_capacity * attr_frequency
                     
-                    urgency = remaining_needed / max(1, expected_future_with_attr)
+                    urgency = (remaining_needed / max(1, expected_future_with_attr)) * 10.0
                     
                     correlation_bonus = 0.0
                     for other_attr, has_other in person_attributes.items():
@@ -74,6 +78,12 @@ class BerghainBouncer:
                     
                     total_value += urgency * (1 + correlation_bonus)
         
+        if all_constraints_met:
+            if constraint_satisfaction > 0:
+                total_value = 0.5
+            else:
+                total_value = 0.3
+        
         progress_ratio = admitted_count / 1000.0
         if progress_ratio < 0.3:
             threshold_modifier = 0.8
@@ -83,9 +93,12 @@ class BerghainBouncer:
             threshold_modifier = 1.2
             
         if constraint_satisfaction > 0:
-            return min(1.0, (total_value / constraint_satisfaction) * threshold_modifier)
+            return min(1.0, total_value * threshold_modifier)
         else:
-            return 0.1
+            if all_constraints_met:
+                return 0.25 * threshold_modifier
+            else:
+                return 0.1
     
     def run_scenario_with_existing_game(self, game_id: str, scenario: int) -> Dict:
         """Run a complete game using an existing game ID"""
@@ -205,7 +218,7 @@ class BerghainBouncer:
                 current_counts, admitted_count
             )
             
-            accept = accept_prob > 0.5
+            accept = accept_prob > 0.15
             
             if accept:
                 admitted_count += 1
