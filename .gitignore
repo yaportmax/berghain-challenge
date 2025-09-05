@@ -1,0 +1,15 @@
+# Debug and test files
+debug_api.py
+test_api_calls.py
+__pycache__/
+*.pyc
+*.pyo
+
+# Results files (can be regenerated)
+results.json
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo

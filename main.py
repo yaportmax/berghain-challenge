@@ -9,9 +9,10 @@ def main():
     total_rejections = 0
     
     print("=== Berghain Bouncer Challenge ===")
-    print("Running all 3 scenarios...\n")
+    print("Running scenarios one at a time to avoid rate limits...\n")
     
     for scenario in [1, 2, 3]:
+        print(f"Starting Scenario {scenario}...")
         try:
             result = bouncer.run_scenario(scenario)
             results.append(result)
@@ -24,8 +25,16 @@ def main():
             
             print("-" * 50)
             
+            if scenario < 3:
+                print("Waiting 5 seconds before next scenario...")
+                import time
+                time.sleep(5)
+            
         except Exception as e:
             print(f"❌ Scenario {scenario}: Error - {str(e)}")
+            if "Rate limited" in str(e):
+                print("Hit rate limit. Please wait for reset before continuing.")
+                break
             import traceback
             traceback.print_exc()
             print("-" * 50)
