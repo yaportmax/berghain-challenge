@@ -158,7 +158,7 @@ class BerghainBouncer:
             constraints = [
                 {"attribute": "underground_veteran", "minCount": 500},
                 {"attribute": "international", "minCount": 650},
-                {"attribute": "fashion_dressed", "minCount": 550},
+                {"attribute": "fashion_forward", "minCount": 550},
                 {"attribute": "queer_friendly", "minCount": 250},
                 {"attribute": "vinyl_collector", "minCount": 200},
                 {"attribute": "german_speaker", "minCount": 800}
@@ -169,7 +169,7 @@ class BerghainBouncer:
                 "relativeFrequencies": {
                     "young": 0.502, "well_dressed": 0.601, "techno_lover": 0.651,
                     "well_connected": 0.451, "creative": 0.062, "berlin_local": 0.398,
-                    "underground_veteran": 0.501, "international": 0.651, "fashion_dressed": 0.551,
+                    "underground_veteran": 0.501, "international": 0.651, "fashion_forward": 0.551,
                     "queer_friendly": 0.251, "vinyl_collector": 0.201, "german_speaker": 0.4565
                 },
                 "correlations": {}
@@ -179,7 +179,7 @@ class BerghainBouncer:
                 "relativeFrequencies": {
                     "young": 0.502, "well_dressed": 0.601, "techno_lover": 0.651,
                     "well_connected": 0.451, "creative": 0.062, "berlin_local": 0.398,
-                    "underground_veteran": 0.501, "international": 0.651, "fashion_dressed": 0.551,
+                    "underground_veteran": 0.501, "international": 0.651, "fashion_forward": 0.551,
                     "queer_friendly": 0.251, "vinyl_collector": 0.201, "german_speaker": 0.4565
                 },
                 "correlations": {}
@@ -189,7 +189,7 @@ class BerghainBouncer:
                 "relativeFrequencies": {
                     "young": 0.502, "well_dressed": 0.601, "techno_lover": 0.651,
                     "well_connected": 0.451, "creative": 0.062, "berlin_local": 0.398,
-                    "underground_veteran": 0.501, "international": 0.651, "fashion_dressed": 0.551,
+                    "underground_veteran": 0.501, "international": 0.651, "fashion_forward": 0.551,
                     "queer_friendly": 0.251, "vinyl_collector": 0.201, "german_speaker": 0.4565
                 },
                 "correlations": {
