@@ -87,18 +87,106 @@ class BerghainBouncer:
         else:
             return 0.1
     
+    def run_scenario_with_existing_game(self, game_id: str, scenario: int) -> Dict:
+        """Run a complete game using an existing game ID"""
+        print(f"Starting scenario {scenario} with existing game {game_id}...")
+        
+        result = self.make_decision(game_id, 0)
+        if "constraints" not in result or "attributeStatistics" not in result:
+            print(f"Initial result: {result}")
+            if result.get("status") != "running":
+                raise Exception(f"Game {game_id} is not in running state: {result.get('status')}")
+        
+        if scenario == 1:
+            constraints = [
+                {"attribute": "young", "minCount": 600},
+                {"attribute": "well_dressed", "minCount": 600}
+            ]
+        elif scenario == 2:
+            constraints = [
+                {"attribute": "techno_lover", "minCount": 650},
+                {"attribute": "well_connected", "minCount": 450},
+                {"attribute": "creative", "minCount": 300},
+                {"attribute": "berlin_local", "minCount": 750}
+            ]
+        elif scenario == 3:
+            constraints = [
+                {"attribute": "underground_veteran", "minCount": 500},
+                {"attribute": "international", "minCount": 650},
+                {"attribute": "fashion_dressed", "minCount": 550},
+                {"attribute": "queer_friendly", "minCount": 250},
+                {"attribute": "vinyl_collector", "minCount": 200},
+                {"attribute": "german_speaker", "minCount": 800}
+            ]
+        
+        if scenario == 1:
+            attribute_stats = {
+                "relativeFrequencies": {
+                    "young": 0.502, "well_dressed": 0.601, "techno_lover": 0.651,
+                    "well_connected": 0.451, "creative": 0.062, "berlin_local": 0.398,
+                    "underground_veteran": 0.501, "international": 0.651, "fashion_dressed": 0.551,
+                    "queer_friendly": 0.251, "vinyl_collector": 0.201, "german_speaker": 0.4565
+                },
+                "correlations": {}
+            }
+        elif scenario == 2:
+            attribute_stats = {
+                "relativeFrequencies": {
+                    "young": 0.502, "well_dressed": 0.601, "techno_lover": 0.651,
+                    "well_connected": 0.451, "creative": 0.062, "berlin_local": 0.398,
+                    "underground_veteran": 0.501, "international": 0.651, "fashion_dressed": 0.551,
+                    "queer_friendly": 0.251, "vinyl_collector": 0.201, "german_speaker": 0.4565
+                },
+                "correlations": {}
+            }
+        else:  # scenario == 3
+            attribute_stats = {
+                "relativeFrequencies": {
+                    "young": 0.502, "well_dressed": 0.601, "techno_lover": 0.651,
+                    "well_connected": 0.451, "creative": 0.062, "berlin_local": 0.398,
+                    "underground_veteran": 0.501, "international": 0.651, "fashion_dressed": 0.551,
+                    "queer_friendly": 0.251, "vinyl_collector": 0.201, "german_speaker": 0.4565
+                },
+                "correlations": {
+                    "german_speaker": {"international": -0.717}
+                }
+            }
+        
+        print(f"Game ID: {game_id}")
+        print(f"Constraints: {constraints}")
+
     def run_scenario(self, scenario: int) -> Dict:
         """Run a complete game for the specified scenario"""
         print(f"Starting scenario {scenario}...")
         
-        game_data = self.create_game(scenario)
-        game_id = game_data["gameId"]
-        constraints = game_data["constraints"]
-        attribute_stats = game_data["attributeStatistics"]
-        
-        print(f"Game ID: {game_id}")
-        print(f"Constraints: {constraints}")
-        
+        try:
+            game_data = self.create_game(scenario)
+            game_id = game_data["gameId"]
+            constraints = game_data["constraints"]
+            attribute_stats = game_data["attributeStatistics"]
+            
+            print(f"Game ID: {game_id}")
+            print(f"Constraints: {constraints}")
+            
+            result = self._run_game_loop(game_id, scenario, constraints, attribute_stats)
+            
+            if "status" not in result:
+                result["status"] = "unknown"
+            
+            return result
+            
+        except Exception as e:
+            print(f"Error in scenario {scenario}: {e}")
+            return {
+                "scenario": scenario,
+                "status": "failed",
+                "rejected_count": 0,
+                "admitted_count": 0,
+                "final_counts": {},
+                "reason": str(e)
+            }
+    
+    def _run_game_loop(self, game_id: str, scenario: int, constraints: List[Dict], attribute_stats: Dict) -> Dict:
         current_counts = {constraint["attribute"]: 0 for constraint in constraints}
         admitted_count = 0
         rejected_count = 0
@@ -110,6 +198,7 @@ class BerghainBouncer:
         while result.get("status") == "running":
             person = result["nextPerson"]
             person_attributes = person["attributes"]
+            current_person_index = person["personIndex"]
             
             accept_prob = self.calculate_acceptance_probability(
                 person_attributes, constraints, attribute_stats, 
@@ -126,25 +215,51 @@ class BerghainBouncer:
             else:
                 rejected_count += 1
             
-            person_index += 1
             try:
-                result = self.make_decision(game_id, person_index, accept)
-                print(f"Decision {person_index}: accept={accept}, result_status={result.get('status', 'MISSING')}")
+                result = self.make_decision(game_id, current_person_index, accept)
+                
+                if "error" in result:
+                    print(f"API Error at person {current_person_index}: {result['error']}")
+                    return {
+                        "scenario": scenario,
+                        "status": "failed",
+                        "rejected_count": rejected_count,
+                        "admitted_count": admitted_count,
+                        "final_counts": current_counts,
+                        "reason": result["error"]
+                    }
+                
+                if "admittedCount" in result:
+                    admitted_count = result["admittedCount"]
+                if "rejectedCount" in result:
+                    rejected_count = result["rejectedCount"]
+                
+                game_status = result.get("status", "running")
+                if game_status != "running":
+                    print(f"Game ended with status: {game_status}")
+                    break
+                    
+                if current_person_index % 100 == 0:
+                    print(f"Person {current_person_index}: Admitted {admitted_count}, Rejected {rejected_count}")
+                    print(f"Constraint progress: {current_counts}")
+                    
             except Exception as e:
-                print(f"Error making decision for person {person_index}: {e}")
+                print(f"Error making decision for person {current_person_index}: {e}")
                 print(f"Last result: {result}")
-                raise
-            
-            if person_index % 100 == 0:
-                print(f"Person {person_index}: Admitted {admitted_count}, Rejected {rejected_count}")
-                print(f"Constraint progress: {current_counts}")
+                return {
+                    "scenario": scenario,
+                    "status": "failed",
+                    "rejected_count": rejected_count,
+                    "admitted_count": admitted_count,
+                    "final_counts": current_counts,
+                    "reason": str(e)
+                }
         
         final_status = result.get("status", "unknown")
         final_rejected_count = result.get("rejectedCount", rejected_count)
         
         print(f"Game completed with status: {final_status}")
         print(f"Final rejected count: {final_rejected_count}")
-        print(f"Final result keys: {list(result.keys())}")
         
         return {
             "scenario": scenario,
