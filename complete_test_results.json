@@ -1,0 +1,16 @@
+{
+  "total_rejections": 0,
+  "scenarios": [
+    {
+      "scenario": 1,
+      "status": "unknown",
+      "rejected_count": 0,
+      "admitted_count": 0,
+      "final_counts": {
+        "young": 0,
+        "well_dressed": 0
+      }
+    }
+  ],
+  "timestamp": "2025-09-05T02:35:35Z"
+}
