@@ -86,6 +86,60 @@ class BerghainBouncer:
             return min(1.0, (total_value / constraint_satisfaction) * threshold_modifier)
         else:
             return 0.1
+
+    def _should_accept_scenario2(
+        self,
+        person_attributes: Dict[str, bool],
+        constraints: List[Dict],
+        current_counts: Dict[str, int],
+        admitted_count: int,
+    ) -> bool:
+        """Specialized decision logic for scenario 2.
+
+        Prioritizes creative and berlin_local attributes while ensuring we
+        do not exceed the maximum number of non-locals that can be admitted
+        (250 when 750 berlin locals are required). The method greedily accepts
+        people who help satisfy still-missing constraints and rejects others.
+        """
+
+        needed = {c["attribute"]: c["minCount"] for c in constraints}
+
+        is_local = person_attributes.get("berlin_local", False)
+        is_creative = person_attributes.get("creative", False)
+        is_techno = person_attributes.get("techno_lover", False)
+        is_connected = person_attributes.get("well_connected", False)
+
+        current_locals = current_counts.get("berlin_local", 0)
+        current_creatives = current_counts.get("creative", 0)
+        current_techno = current_counts.get("techno_lover", 0)
+        current_connected = current_counts.get("well_connected", 0)
+
+        max_non_local = 1000 - needed.get("berlin_local", 0)
+        non_local_admitted = admitted_count - current_locals
+
+        # Stage 1: we still need more creatives
+        if current_creatives < needed.get("creative", 0):
+            if is_creative and (is_local or non_local_admitted < max_non_local):
+                return True
+            return False
+
+        # Stage 2: creative target met, now fill berlin locals
+        if current_locals < needed.get("berlin_local", 0):
+            if is_local:
+                return True
+            return False
+
+        # Stage 3: satisfy remaining techno_lover and well_connected counts
+        if current_techno < needed.get("techno_lover", 0) and is_techno:
+            return True
+        if current_connected < needed.get("well_connected", 0) and is_connected:
+            return True
+
+        # Once all constraints satisfied, accept everyone
+        if all(current_counts[attr] >= need for attr, need in needed.items()):
+            return True
+
+        return False
     
     def run_scenario_with_existing_game(self, game_id: str, scenario: int) -> Dict:
         """Run a complete game using an existing game ID"""
@@ -200,12 +254,16 @@ class BerghainBouncer:
             person_attributes = person["attributes"]
             current_person_index = person["personIndex"]
             
-            accept_prob = self.calculate_acceptance_probability(
-                person_attributes, constraints, attribute_stats, 
-                current_counts, admitted_count
-            )
-            
-            accept = accept_prob > 0.5
+            if scenario == 2:
+                accept = self._should_accept_scenario2(
+                    person_attributes, constraints, current_counts, admitted_count
+                )
+            else:
+                accept_prob = self.calculate_acceptance_probability(
+                    person_attributes, constraints, attribute_stats,
+                    current_counts, admitted_count
+                )
+                accept = accept_prob > 0.5
             
             if accept:
                 admitted_count += 1
