@@ -1,6 +1,5 @@
 import requests
 import json
-import math
 from typing import Dict, List, Optional, Tuple
 
 class BerghainBouncer:
@@ -86,6 +85,105 @@ class BerghainBouncer:
             return min(1.0, (total_value / constraint_satisfaction) * threshold_modifier)
         else:
             return 0.1
+
+    def _should_accept_scenario1(
+        self,
+        person_attributes: Dict[str, bool],
+        constraints: List[Dict],
+        current_counts: Dict[str, int],
+        admitted_count: int,
+        attribute_stats: Dict,
+        encountered_counts: Dict[str, int],
+        encountered_joint: int,
+        encountered_total: int,
+        optimism: float = 0.02,
+    ) -> bool:
+        """Adaptive acceptance rules for scenario 1.
+
+        This version re-introduces an expectation-based component: we
+        estimate future supply of each attribute from observed
+        frequencies and admit single-attribute entrants when those
+        projections indicate the remaining quota for the other attribute
+        is likely attainable.  The heuristic is:
+
+        * Always admit people who satisfy both attributes.
+        * For single-attribute entrants, compare the remaining need for
+          the opposite attribute against the number of expected future
+          occurrences based on the running frequencies.  Admit if the
+          forecast supply covers the deficit.
+        * Once both minimum counts are met, admit everyone.
+
+        The tracking arguments allow the caller to record statistics so
+        strategies can be analysed post-game.
+        """
+
+        needed = {c["attribute"]: c["minCount"] for c in constraints}
+        need_young = needed.get("young", 0) - current_counts.get("young", 0)
+        need_well = needed.get("well_dressed", 0) - current_counts.get("well_dressed", 0)
+
+        is_young = person_attributes.get("young", False)
+        is_well = person_attributes.get("well_dressed", False)
+
+        if need_young <= 0 and need_well <= 0:
+            return True
+
+        # Always admit entrants with both attributes while either quota
+        # is still missing.
+        if is_young and is_well:
+            return True
+
+        remaining_slots = 1000 - admitted_count
+        if remaining_slots <= 0:
+            return False
+
+        # Estimate attribute frequencies from observed counts.  This retains
+        # the empirical approach but we now combine it with a "balancing"
+        # heuristic that favors whichever attribute is more urgently needed.
+        freqs = attribute_stats.get("relativeFrequencies", {})
+
+        if encountered_total > 0:
+            # Apply a Beta(1,1) prior for smoother early estimates.
+            freq_y = (encountered_counts.get("young", 0) + 1) / (encountered_total + 2)
+            freq_w = (encountered_counts.get("well_dressed", 0) + 1) / (encountered_total + 2)
+            freq_both = (encountered_joint + 1) / (encountered_total + 2)
+        else:
+            freq_y = freqs.get("young", 0.33)
+            freq_w = freqs.get("well_dressed", 0.33)
+            freq_both = min(freq_y, freq_w) * 0.8
+
+        freq_y = min(1.0, freq_y + optimism)
+        freq_w = min(1.0, freq_w + optimism)
+        freq_both = min(1.0, freq_both + optimism)
+
+        remaining_after = remaining_slots - 1
+        freq_y_only = max(0.0, freq_y - freq_both)
+        freq_w_only = max(0.0, freq_w - freq_both)
+        exp_y_only = freq_y_only * remaining_after
+        exp_w_only = freq_w_only * remaining_after
+        exp_both = freq_both * remaining_after
+
+        # Use joint-frequency projections. For single-attribute entrants,
+        # ensure the expected future supply (including people with both
+        # attributes) can still satisfy the outstanding quotas.
+        if is_young and not is_well and need_young > 0:
+            if need_young >= need_well:
+                return True
+            need_y_after = max(0, need_young - 1)
+            exp_future_y = exp_y_only + exp_both
+            exp_future_w = exp_w_only + exp_both
+            return exp_future_w >= need_well and exp_future_y >= need_y_after
+
+        if is_well and not is_young and need_well > 0:
+            if need_well >= need_young:
+                return True
+            need_w_after = max(0, need_well - 1)
+            exp_future_y = exp_y_only + exp_both
+            exp_future_w = exp_w_only + exp_both
+            return exp_future_y >= need_young and exp_future_w >= need_w_after
+
+        # Entrants with no relevant attributes are rejected until all
+        # requirements are satisfied.
+        return False
 
     def _should_accept_scenario2(
         self,
@@ -209,26 +307,33 @@ class BerghainBouncer:
         print(f"Game ID: {game_id}")
         print(f"Constraints: {constraints}")
 
-    def run_scenario(self, scenario: int) -> Dict:
-        """Run a complete game for the specified scenario"""
-        print(f"Starting scenario {scenario}...")
-        
+    def run_scenario(self, scenario: int, optimism: float = 0.02) -> Dict:
+        """Run a complete game for the specified scenario.
+
+        The ``optimism`` parameter tweaks the acceptance heuristic for
+        scenario 1, allowing automated sweeps over more aggressive or
+        conservative strategies.
+        """
+        print(f"Starting scenario {scenario} with optimism {optimism}...")
+
         try:
             game_data = self.create_game(scenario)
             game_id = game_data["gameId"]
             constraints = game_data["constraints"]
             attribute_stats = game_data["attributeStatistics"]
-            
+
             print(f"Game ID: {game_id}")
             print(f"Constraints: {constraints}")
-            
-            result = self._run_game_loop(game_id, scenario, constraints, attribute_stats)
-            
+
+            result = self._run_game_loop(
+                game_id, scenario, constraints, attribute_stats, optimism
+            )
+
             if "status" not in result:
                 result["status"] = "unknown"
-            
+
             return result
-            
+
         except Exception as e:
             print(f"Error in scenario {scenario}: {e}")
             return {
@@ -239,22 +344,77 @@ class BerghainBouncer:
                 "final_counts": {},
                 "reason": str(e)
             }
+
+    def run_scenario_until(
+        self,
+        scenario: int,
+        target_rejections: int = 800,
+        max_attempts: int = 20,
+        optimism_start: float = 0.02,
+        optimism_step: float = 0.05,
+    ) -> Dict:
+        """Repeatedly run a scenario, increasing optimism each attempt,
+        until the rejected count drops below ``target_rejections`` or
+        ``max_attempts`` is reached."""
+        best_result = None
+        last_result = None
+        optimism = optimism_start
+        for attempt in range(1, max_attempts + 1):
+            print(f"Attempt {attempt} for scenario {scenario} (optimism={optimism:.2f})")
+            result = self.run_scenario(scenario, optimism=optimism)
+            last_result = result
+            rejected = result.get("rejected_count", 9999)
+
+            if result.get("status") == "completed":
+                if best_result is None or rejected < best_result.get("rejected_count", 9999):
+                    best_result = result
+
+                if rejected < target_rejections:
+                    print(f"Achieved target with {rejected} rejections on attempt {attempt}")
+                    break
+
+            print(f"Attempt {attempt} finished with {rejected} rejections")
+            optimism += optimism_step
+
+        return best_result if best_result is not None else last_result
     
-    def _run_game_loop(self, game_id: str, scenario: int, constraints: List[Dict], attribute_stats: Dict) -> Dict:
+    def _run_game_loop(
+        self,
+        game_id: str,
+        scenario: int,
+        constraints: List[Dict],
+        attribute_stats: Dict,
+        optimism: float = 0.02,
+    ) -> Dict:
         current_counts = {constraint["attribute"]: 0 for constraint in constraints}
+        encountered_counts = {constraint["attribute"]: 0 for constraint in constraints}
+        encountered_joint = 0
+        encountered_total = 0
         admitted_count = 0
         rejected_count = 0
         person_index = 0
-        
+
         result = self.make_decision(game_id, person_index)
         print(f"Initial result: {result}")
-        
+
         while result.get("status") == "running":
             person = result["nextPerson"]
             person_attributes = person["attributes"]
             current_person_index = person["personIndex"]
-            
-            if scenario == 2:
+
+            if scenario == 1:
+                accept = self._should_accept_scenario1(
+                    person_attributes,
+                    constraints,
+                    current_counts,
+                    admitted_count,
+                    attribute_stats,
+                    encountered_counts,
+                    encountered_joint,
+                    encountered_total,
+                    optimism,
+                )
+            elif scenario == 2:
                 accept = self._should_accept_scenario2(
                     person_attributes, constraints, current_counts, admitted_count
                 )
@@ -264,7 +424,7 @@ class BerghainBouncer:
                     current_counts, admitted_count
                 )
                 accept = accept_prob > 0.5
-            
+
             if accept:
                 admitted_count += 1
                 for attr, has_attr in person_attributes.items():
@@ -272,10 +432,17 @@ class BerghainBouncer:
                         current_counts[attr] += 1
             else:
                 rejected_count += 1
-            
+
+            encountered_total += 1
+            for attr in encountered_counts:
+                if person_attributes.get(attr, False):
+                    encountered_counts[attr] += 1
+            if scenario == 1 and person_attributes.get("young") and person_attributes.get("well_dressed"):
+                encountered_joint += 1
+
             try:
                 result = self.make_decision(game_id, current_person_index, accept)
-                
+
                 if "error" in result:
                     print(f"API Error at person {current_person_index}: {result['error']}")
                     return {
@@ -286,21 +453,25 @@ class BerghainBouncer:
                         "final_counts": current_counts,
                         "reason": result["error"]
                     }
-                
+
                 if "admittedCount" in result:
                     admitted_count = result["admittedCount"]
                 if "rejectedCount" in result:
                     rejected_count = result["rejectedCount"]
-                
+
                 game_status = result.get("status", "running")
                 if game_status != "running":
                     print(f"Game ended with status: {game_status}")
                     break
-                    
+
                 if current_person_index % 100 == 0:
                     print(f"Person {current_person_index}: Admitted {admitted_count}, Rejected {rejected_count}")
                     print(f"Constraint progress: {current_counts}")
-                    
+                    if scenario == 1 and encountered_total > 0:
+                        obs_y = encountered_counts["young"] / encountered_total
+                        obs_w = encountered_counts["well_dressed"] / encountered_total
+                        print(f"Observed frequencies: young={obs_y:.3f}, well_dressed={obs_w:.3f}")
+
             except Exception as e:
                 print(f"Error making decision for person {current_person_index}: {e}")
                 print(f"Last result: {result}")
@@ -312,17 +483,35 @@ class BerghainBouncer:
                     "final_counts": current_counts,
                     "reason": str(e)
                 }
-        
+
         final_status = result.get("status", "unknown")
         final_rejected_count = result.get("rejectedCount", rejected_count)
-        
+
         print(f"Game completed with status: {final_status}")
         print(f"Final rejected count: {final_rejected_count}")
-        
-        return {
+        print(f"Total encountered: {encountered_total}")
+        print(f"Encountered counts: {encountered_counts}")
+        result_dict = {
             "scenario": scenario,
             "status": final_status,
             "rejected_count": final_rejected_count,
             "admitted_count": admitted_count,
-            "final_counts": current_counts
+            "final_counts": current_counts,
+            "encountered_total": encountered_total,
+            "encountered_counts": encountered_counts,
         }
+        if scenario == 1:
+            print(f"Encountered both young & well_dressed: {encountered_joint}")
+            if encountered_total > 0:
+                obs_y = encountered_counts.get("young", 0) / encountered_total
+                obs_w = encountered_counts.get("well_dressed", 0) / encountered_total
+                theoretical_min = int(max(600 / max(obs_y, 1e-9), 600 / max(obs_w, 1e-9)) - 1000)
+                result_dict.update({
+                    "encountered_joint": encountered_joint,
+                    "observed_frequencies": {"young": obs_y, "well_dressed": obs_w},
+                    "theoretical_min_rejections": theoretical_min,
+                })
+            else:
+                result_dict["encountered_joint"] = encountered_joint
+
+        return result_dict
