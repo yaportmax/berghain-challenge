@@ -121,9 +121,13 @@ class IterativeScenario3Optimizer(BerghainBouncer):
                 print(f"Person {index}: Focus trait {focus_trait}: {counts.get(focus_trait, 0)}/{self.constraints[focus_trait]}")
                 print(f"  Admitted: {admitted}, Rejected: {rejected}")
                 
+        final_status = result.get("status", "unknown")
+        if final_status == "running":
+            final_status = "completed"
+            
         return {
             "focus_trait": focus_trait,
-            "status": result.get("status", "unknown"),
+            "status": final_status,
             "rejected_count": result.get("rejectedCount", rejected),
             "admitted_count": admitted,
             "final_counts": counts,
@@ -195,7 +199,7 @@ def main():
     output = optimizer.save_results(results)
     
     print("\n=== OPTIMIZATION SUMMARY ===")
-    successful_runs = [r for r in results if r.get("status") != "failed" and r.get("status") != "unknown"]
+    successful_runs = [r for r in results if r.get("status") in ["completed", "finished"]]
     
     if successful_runs:
         best_result = min(successful_runs, key=lambda x: x.get("rejected_count", float('inf')))
