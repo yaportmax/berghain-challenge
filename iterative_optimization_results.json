@@ -1,0 +1,121 @@
+{
+  "strategy": "rare_traits_first",
+  "trait_priority": [
+    "vinyl_collector",
+    "queer_friendly",
+    "german_speaker",
+    "underground_veteran",
+    "fashion_dressed",
+    "international"
+  ],
+  "trait_frequencies": {
+    "vinyl_collector": 0.201,
+    "queer_friendly": 0.251,
+    "german_speaker": 0.4565,
+    "underground_veteran": 0.501,
+    "fashion_dressed": 0.551,
+    "international": 0.651
+  },
+  "constraints": {
+    "vinyl_collector": 200,
+    "queer_friendly": 250,
+    "german_speaker": 800,
+    "underground_veteran": 500,
+    "fashion_dressed": 550,
+    "international": 650
+  },
+  "results": [
+    {
+      "focus_trait": "vinyl_collector",
+      "status": "failed",
+      "rejected_count": 32,
+      "admitted_count": 1000,
+      "final_counts": {
+        "vinyl_collector": 53,
+        "queer_friendly": 49,
+        "german_speaker": 479,
+        "underground_veteran": 708,
+        "fashion_dressed": 0,
+        "international": 586
+      },
+      "game_id": "c3969ffd-53d3-4d64-b9c1-257f10ba3bdf"
+    },
+    {
+      "focus_trait": "queer_friendly",
+      "status": "failed",
+      "rejected_count": 31,
+      "admitted_count": 1000,
+      "final_counts": {
+        "vinyl_collector": 44,
+        "queer_friendly": 41,
+        "german_speaker": 478,
+        "underground_veteran": 704,
+        "fashion_dressed": 0,
+        "international": 603
+      },
+      "game_id": "4cbced2d-b333-4226-9fd1-dc4344474553"
+    },
+    {
+      "focus_trait": "german_speaker",
+      "status": "failed",
+      "rejected_count": 29,
+      "admitted_count": 1000,
+      "final_counts": {
+        "vinyl_collector": 49,
+        "queer_friendly": 43,
+        "german_speaker": 477,
+        "underground_veteran": 685,
+        "fashion_dressed": 0,
+        "international": 588
+      },
+      "game_id": "3bc0f842-0ae4-43de-bed1-c26890630822"
+    },
+    {
+      "focus_trait": "underground_veteran",
+      "status": "failed",
+      "rejected_count": 32,
+      "admitted_count": 1000,
+      "final_counts": {
+        "vinyl_collector": 42,
+        "queer_friendly": 43,
+        "german_speaker": 458,
+        "underground_veteran": 715,
+        "fashion_dressed": 0,
+        "international": 614
+      },
+      "game_id": "94284b5a-7e24-4362-a23e-f337d47f859f"
+    },
+    {
+      "focus_trait": "fashion_dressed",
+      "status": "failed",
+      "rejected_count": 26,
+      "admitted_count": 1000,
+      "final_counts": {
+        "vinyl_collector": 45,
+        "queer_friendly": 44,
+        "german_speaker": 482,
+        "underground_veteran": 710,
+        "fashion_dressed": 0,
+        "international": 590
+      },
+      "game_id": "df950b5e-3cea-4b35-8fba-79851d28f8b8"
+    },
+    {
+      "focus_trait": "international",
+      "status": "failed",
+      "rejected_count": 29,
+      "admitted_count": 1000,
+      "final_counts": {
+        "vinyl_collector": 40,
+        "queer_friendly": 46,
+        "german_speaker": 449,
+        "underground_veteran": 698,
+        "fashion_dressed": 0,
+        "international": 618
+      },
+      "game_id": "d9e646c9-cacb-400f-bd6e-2f840fe1db0a"
+    }
+  ],
+  "total_iterations": 6,
+  "timestamp": "2025-09-08T01:21:37Z"
+}
