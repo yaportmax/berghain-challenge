@@ -33,7 +33,7 @@ class Scenario3Bouncer(BerghainBouncer):
         needed = {
             "underground_veteran": 500,
             "international": 650,
-            "fashion_forward": 550,
+            "fashion_dressed": 550,
             "queer_friendly": 250,
             "vinyl_collector": 200,
             "german_speaker": 800,
@@ -83,7 +83,7 @@ class Scenario3Bouncer(BerghainBouncer):
                 constraints = [
                     {"attribute": "underground_veteran", "minCount": 500},
                     {"attribute": "international", "minCount": 650},
-                    {"attribute": "fashion_forward", "minCount": 550},
+                    {"attribute": "fashion_dressed", "minCount": 550},
                     {"attribute": "queer_friendly", "minCount": 250},
                     {"attribute": "vinyl_collector", "minCount": 200},
                     {"attribute": "german_speaker", "minCount": 800},
