@@ -48,24 +48,26 @@ class IterativeScenario3Optimizer(BerghainBouncer):
             key=lambda x: self.trait_frequencies[x]
         )
         
-    def _should_accept_rare_trait_strategy(
+    def _should_accept_priority_strategy(
         self, 
         attrs: Dict[str, bool], 
         current: Dict[str, int], 
-        admitted: int,
-        focus_trait: str
+        admitted: int
     ) -> bool:
         """
-        Accept people who have the focus trait OR help with other unmet constraints.
-        This prioritizes the rarest traits while still making progress on others.
+        Accept people who have at least one of the 3 priority traits OR help with any unmet constraint.
+        Priority traits: queer_friendly, vinyl_collector, german_speaker
         """
         remaining_capacity = 1000 - admitted
         if remaining_capacity <= 0:
             return False
             
-        if attrs.get(focus_trait, False) and current.get(focus_trait, 0) < self.constraints[focus_trait]:
-            return True
-            
+        priority_traits = {"queer_friendly", "vinyl_collector", "german_speaker"}
+        for trait in priority_traits:
+            if attrs.get(trait, False) and current.get(trait, 0) < self.constraints[trait]:
+                return True
+        
+        # Accept people who help with ANY unmet constraint to ensure scenario completion
         for trait, target in self.constraints.items():
             if attrs.get(trait, False) and current.get(trait, 0) < target:
                 return True
@@ -75,24 +77,18 @@ class IterativeScenario3Optimizer(BerghainBouncer):
             for trait, target in self.constraints.items()
         )
         
-        if all_constraints_met:
-            return True
-            
-        return False
+        return all_constraints_met
         
-    def run_with_strategy(self, focus_trait: str, existing_game_id: str | None = None) -> Dict:
-        """Run scenario 3 with focus on a specific rare trait."""
-        print(f"Running scenario 3 with focus on: {focus_trait}")
-        print(f"Trait frequency: {self.trait_frequencies[focus_trait]:.3f}")
-        print(f"Target count: {self.constraints[focus_trait]}/1000")
+    def run_priority_strategy(self) -> Dict:
+        """Run scenario 3 with priority on the 3 rarest traits."""
+        print("=== Priority Traits Scenario 3 Strategy ===")
+        print("Priority traits: queer_friendly, vinyl_collector, german_speaker")
+        print("Strategy: Accept people with at least one priority trait OR anyone who helps with unmet constraints")
+        print()
         
-        if existing_game_id:
-            game_id = existing_game_id
-            result = self.make_decision(game_id, 0)
-        else:
-            game = self.create_game(3)
-            game_id = game["gameId"]
-            result = self.make_decision(game_id, 0)
+        game = self.create_game(3)
+        game_id = game["gameId"]
+        result = self.make_decision(game_id, 0)
             
         counts = {attr: 0 for attr in self.constraints}
         admitted = 0
@@ -103,8 +99,8 @@ class IterativeScenario3Optimizer(BerghainBouncer):
             attrs = person["attributes"]
             index = person["personIndex"]
             
-            accept = self._should_accept_rare_trait_strategy(
-                attrs, counts, admitted, focus_trait
+            accept = self._should_accept_priority_strategy(
+                attrs, counts, admitted
             )
             
             if accept:
@@ -118,60 +114,54 @@ class IterativeScenario3Optimizer(BerghainBouncer):
             result = self.make_decision(game_id, index, accept)
             
             if index % 200 == 0:
-                print(f"Person {index}: Focus trait {focus_trait}: {counts.get(focus_trait, 0)}/{self.constraints[focus_trait]}")
+                priority_traits = {"queer_friendly", "vinyl_collector", "german_speaker"}
+                active_priority = [t for t in priority_traits if counts.get(t, 0) < self.constraints[t]]
+                print(f"Person {index}: Active priority traits: {active_priority}")
+                print(f"  Priority counts: queer_friendly={counts.get('queer_friendly', 0)}/250, "
+                      f"vinyl_collector={counts.get('vinyl_collector', 0)}/200, "
+                      f"german_speaker={counts.get('german_speaker', 0)}/800")
+                print(f"  All counts: {counts}")
                 print(f"  Admitted: {admitted}, Rejected: {rejected}")
                 
         final_status = result.get("status", "unknown")
         if final_status == "running":
             final_status = "completed"
             
+        constraints_met = all(
+            counts.get(trait, 0) >= target 
+            for trait, target in self.constraints.items()
+        )
+        
         return {
-            "focus_trait": focus_trait,
+            "strategy": "priority_3_rarest_traits",
             "status": final_status,
+            "scenario_won": constraints_met,
             "rejected_count": result.get("rejectedCount", rejected),
             "admitted_count": admitted,
             "final_counts": counts,
+            "constraints_met": {
+                trait: counts.get(trait, 0) >= target
+                for trait, target in self.constraints.items()
+            },
             "game_id": game_id
         }
         
-    def run_iterative_optimization(self, max_iterations: int = 6) -> List[Dict]:
-        """Run iterative optimization focusing on each trait in order of rarity."""
-        results = []
-        
-        print("=== Iterative Scenario 3 Optimization ===")
-        print("Strategy: Focus on rarest traits first")
-        print(f"Trait priority order: {self.trait_priority}")
-        print()
-        
-        for i, focus_trait in enumerate(self.trait_priority):
-            if i >= max_iterations:
-                break
-                
-            print(f"\n--- Iteration {i+1}/{min(max_iterations, len(self.trait_priority))} ---")
-            
-            try:
-                result = self.run_with_strategy(focus_trait)
-                results.append(result)
-                
-                print(f"✅ Completed with {result['rejected_count']} rejections")
-                print(f"Final counts: {result['final_counts']}")
-                
-                if i < min(max_iterations, len(self.trait_priority)) - 1:
-                    print("Waiting 15 seconds before next iteration...")
-                    time.sleep(15)
-                    
-            except Exception as e:
-                print(f"❌ Error in iteration {i+1}: {e}")
-                if "rate" in str(e).lower() or "limit" in str(e).lower():
-                    print("Hit rate limit. Stopping optimization.")
-                    break
-                results.append({
-                    "focus_trait": focus_trait,
-                    "status": "failed",
-                    "error": str(e)
-                })
-                
-        return results
+    def run_single_priority_game(self) -> Dict:
+        """Run a single game with priority traits strategy."""
+        try:
+            result = self.run_priority_strategy()
+            print(f"✅ Completed with {result['rejected_count']} rejections")
+            print(f"Scenario won: {result['scenario_won']}")
+            print(f"Final counts: {result['final_counts']}")
+            return result
+        except Exception as e:
+            print(f"❌ Error: {e}")
+            return {
+                "strategy": "priority_3_rarest_traits",
+                "status": "failed",
+                "scenario_won": False,
+                "error": str(e)
+            }
         
     def save_results(self, results: List[Dict], filename: str = "iterative_optimization_results.json"):
         """Save optimization results to file."""
@@ -194,23 +184,38 @@ class IterativeScenario3Optimizer(BerghainBouncer):
 
 def main():
     optimizer = IterativeScenario3Optimizer()
-    results = optimizer.run_iterative_optimization()
+    result = optimizer.run_single_priority_game()
     
-    output = optimizer.save_results(results)
+    output = {
+        "strategy": "priority_3_rarest_traits",
+        "priority_traits": ["queer_friendly", "vinyl_collector", "german_speaker"],
+        "constraints": optimizer.constraints,
+        "result": result,
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ")
+    }
     
-    print("\n=== OPTIMIZATION SUMMARY ===")
-    successful_runs = [r for r in results if r.get("status") in ["completed", "finished"]]
+    with open("priority_optimization_result.json", "w") as f:
+        json.dump(output, f, indent=2)
     
-    if successful_runs:
-        best_result = min(successful_runs, key=lambda x: x.get("rejected_count", float('inf')))
-        print(f"Best result: {best_result['rejected_count']} rejections")
-        print(f"Focus trait: {best_result['focus_trait']}")
-        print(f"Final counts: {best_result['final_counts']}")
-        
-        avg_rejections = sum(r.get("rejected_count", 0) for r in successful_runs) / len(successful_runs)
-        print(f"Average rejections: {avg_rejections:.1f}")
+    print("\n=== PRIORITY STRATEGY RESULTS ===")
+    print(f"Scenario won: {result.get('scenario_won', False)}")
+    print(f"Status: {result.get('status', 'unknown')}")
+    print(f"Rejections: {result.get('rejected_count', 'unknown')}")
+    print(f"Admitted: {result.get('admitted_count', 'unknown')}")
+    
+    if result.get('final_counts'):
+        print("\nConstraint achievement:")
+        for trait, target in optimizer.constraints.items():
+            count = result['final_counts'].get(trait, 0)
+            met = result.get('constraints_met', {}).get(trait, False)
+            percentage = (count / target) * 100
+            status = "✅" if met else "❌"
+            print(f"  {status} {trait}: {count}/{target} ({percentage:.1f}%)")
+    
+    if result.get('scenario_won'):
+        print("\n🎉 SCENARIO 3 WON! All constraints met within 1000 people.")
     else:
-        print("No successful runs completed.")
+        print("\n❌ Scenario not won. Some constraints not met.")
 
 
 if __name__ == "__main__":
