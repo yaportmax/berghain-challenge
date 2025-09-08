@@ -1,0 +1,41 @@
+{
+  "strategy": "strict_priority_traits_only",
+  "priority_traits": [
+    "vinyl_collector",
+    "german_speaker",
+    "queer_friendly"
+  ],
+  "constraints": {
+    "vinyl_collector": 200,
+    "queer_friendly": 250,
+    "german_speaker": 800,
+    "underground_veteran": 500,
+    "fashion_dressed": 550,
+    "international": 650
+  },
+  "result": {
+    "strategy": "strict_priority_traits_only",
+    "status": "failed",
+    "scenario_won": false,
+    "rejected_count": 3162,
+    "admitted_count": 1000,
+    "final_counts": {
+      "vinyl_collector": 187,
+      "queer_friendly": 188,
+      "german_speaker": 906,
+      "underground_veteran": 744,
+      "fashion_dressed": 0,
+      "international": 253
+    },
+    "constraints_met": {
+      "vinyl_collector": false,
+      "queer_friendly": false,
+      "german_speaker": true,
+      "underground_veteran": true,
+      "fashion_dressed": false,
+      "international": false
+    },
+    "game_id": "587696b2-54a0-4328-85b0-c5f985c812e4"
+  },
+  "timestamp": "2025-09-08T05:54:21Z"
+}
