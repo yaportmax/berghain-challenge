@@ -1,0 +1,41 @@
+{
+  "strategy_description": "Focus on 3 rarest traits: queer_friendly, vinyl_collector, german_speaker",
+  "priority_traits": [
+    "queer_friendly",
+    "german_speaker",
+    "vinyl_collector"
+  ],
+  "constraints": {
+    "vinyl_collector": 200,
+    "queer_friendly": 250,
+    "german_speaker": 800,
+    "underground_veteran": 500,
+    "fashion_dressed": 550,
+    "international": 650
+  },
+  "result": {
+    "strategy": "focused_3_rarest_traits",
+    "status": "failed",
+    "scenario_won": false,
+    "rejected_count": 2868,
+    "admitted_count": 1000,
+    "final_counts": {
+      "vinyl_collector": 185,
+      "queer_friendly": 177,
+      "german_speaker": 895,
+      "underground_veteran": 729,
+      "fashion_dressed": 0,
+      "international": 263
+    },
+    "constraints_met": {
+      "vinyl_collector": false,
+      "queer_friendly": false,
+      "german_speaker": true,
+      "underground_veteran": true,
+      "fashion_dressed": false,
+      "international": false
+    },
+    "game_id": "cc212dbe-31c1-4c4a-9a95-7902461c4b81"
+  },
+  "timestamp": "2025-09-08T05:10:24Z"
+}

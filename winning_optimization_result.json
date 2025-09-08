@@ -1,0 +1,41 @@
+{
+  "strategy_description": "Adaptive phases focusing on 3 rarest traits to win scenario",
+  "priority_traits": [
+    "vinyl_collector",
+    "german_speaker",
+    "queer_friendly"
+  ],
+  "constraints": {
+    "vinyl_collector": 200,
+    "queer_friendly": 250,
+    "german_speaker": 800,
+    "underground_veteran": 500,
+    "fashion_dressed": 550,
+    "international": 650
+  },
+  "result": {
+    "strategy": "winning_3_rarest_traits_adaptive",
+    "status": "failed",
+    "scenario_won": false,
+    "rejected_count": 655,
+    "admitted_count": 1000,
+    "final_counts": {
+      "vinyl_collector": 76,
+      "queer_friendly": 85,
+      "german_speaker": 752,
+      "underground_veteran": 702,
+      "fashion_dressed": 0,
+      "international": 395
+    },
+    "constraints_met": {
+      "vinyl_collector": false,
+      "queer_friendly": false,
+      "german_speaker": false,
+      "underground_veteran": true,
+      "fashion_dressed": false,
+      "international": false
+    },
+    "game_id": "058fa299-8d09-48a4-8d65-8a584cc799bd"
+  },
+  "timestamp": "2025-09-08T05:16:26Z"
+}
